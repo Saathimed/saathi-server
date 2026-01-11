@@ -1,72 +1,83 @@
+// server.js - Real AI Integration
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const OpenAI = require('openai');
 
 const app = express();
-
-// Allow requests from anywhere (Extension support)
 app.use(cors());
 app.use(bodyParser.json());
 
-// --- MOCK DATABASE (असली में यह MongoDB/Firebase होगा) ---
-const patients = {
-    "9876543210": { name: "Ramesh Kumar", age: 45, gender: "M", history: "Diabetes, Hypertension", last_visit: "10 Aug 2024" },
-    "9988776655": { name: "Sita Devi", age: 32, gender: "F", history: "Anemia", last_visit: "02 Sep 2024" }
-};
-
-// Root Route (Check karne ke liye ki server zinda hai ya nahi)
-app.get('/', (req, res) => {
-    res.send("✅ SaathiMed Brain is Active & Running!");
+// --- CONFIGURATION ---
+// Yahan apni OpenAI Key dalo (ya Environment Variable use karo)
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY // 👈 Sirf ye likho. String mat dalo.
 });
 
-// --- API 1: Check Patient Profile ---
+// --- API 1: Analyze Symptoms (Powered by GPT) ---
+app.post('/api/analyze', async (req, res) => {
+    const { text } = req.body;
+    console.log(`🤖 AI Analyzing: ${text}`);
+
+    if (!text) return res.json({ risk: "Error", advice: "No input provided." });
+
+    try {
+        // GPT Prompt Engineering (Doctor Persona)
+        const prompt = `
+        Act as a Senior Consultant Doctor in India.
+        Patient Symptoms: "${text}"
+        
+        Provide response in JSON format:
+        {
+            "risk": "Low/Medium/High",
+            "diagnosis": "Possible Differential Diagnosis (DDx)",
+            "medicine": "Suggested generic medicines with dosage (India specific)",
+            "advice": "Next steps or tests",
+            "specialist_needed": true/false
+        }
+        Keep it concise.
+        `;
+
+        const completion = await openai.chat.completions.create({
+            messages: [{ role: "system", content: prompt }],
+            model: "gpt-3.5-turbo", // Ya gpt-4 agar budget hai
+            response_format: { type: "json_object" },
+        });
+
+        const aiResponse = JSON.parse(completion.choices[0].message.content);
+        
+        // Send actual AI response to Extension
+        res.json({
+            risk: aiResponse.risk,
+            advice: `<strong>DDx:</strong> ${aiResponse.diagnosis}<br><br><strong>Rx:</strong> ${aiResponse.medicine}<br><br><strong>Plan:</strong> ${aiResponse.advice}`,
+            specialist_needed: aiResponse.specialist_needed
+        });
+
+    } catch (error) {
+        console.error("OpenAI Error:", error);
+        res.json({ risk: "Error", advice: "AI brain is currently busy.", specialist_needed: false });
+    }
+});
+
+// --- API 2: Check Patient (Real DB connection logic needed here) ---
 app.post('/api/check-patient', (req, res) => {
     const { phone } = req.body;
-    console.log(`🔎 Searching: ${phone}`);
-
-    if (patients[phone]) {
-        res.json({ status: "found", data: patients[phone] });
+    
+    // TODO: Yahan hum tumhare Firebase/SQL se connect karenge
+    // Abhi ke liye Dummy rakhte hain taaki extension na tute
+    if (phone === "9876543210") {
+        res.json({ 
+            status: "found", 
+            data: { name: "Ramesh Kumar (Demo)", age: 45, gender: "M", history: "Diabetes", last_visit: "Yesterday" } 
+        });
     } else {
         res.json({ status: "new", message: "No record found." });
     }
 });
 
-// --- API 2: Onboard Patient ---
-app.post('/api/onboard', (req, res) => {
-    const { phone } = req.body;
-    console.log(`📲 Onboarding: ${phone}`);
-    // Future: Yahan SMS/WhatsApp API integrate hoga
-    res.json({ success: true, message: "Link sent." });
-});
-
-// --- API 3: AI Analysis (Simple Logic) ---
-app.post('/api/analyze', (req, res) => {
-    const { text } = req.body;
-    if (!text) return res.json({ risk: "Unknown", advice: "No text provided." });
-    
-    const lowerText = text.toLowerCase();
-    let risk = "Low";
-    let advice = "General observation required. Monitor vitals.";
-    let specialist_needed = false;
-
-    // Basic Rule Engine
-    if (lowerText.includes("chest") || lowerText.includes("sweating") || lowerText.includes("breath")) {
-        risk = "HIGH (Cardiac Risk)";
-        advice = "Immediate ECG required. Do not delay. Refer to Cardiologist.";
-        specialist_needed = true;
-    } else if (lowerText.includes("fever") && lowerText.includes("joint")) {
-        risk = "Medium (Possible Dengue)";
-        advice = "Check Platelet count. Ensure Hydration.";
-    } else if (lowerText.includes("sugar") || lowerText.includes("dizzy")) {
-        risk = "Medium (Hypoglycemia Risk)";
-        advice = "Check RBS immediately. Give glucose if low.";
-    }
-
-    res.json({ risk, advice, specialist_needed });
-});
-
-// Start Server (Render uses process.env.PORT)
+// --- Start Server ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`✅ SaathiMed Brain (AI Enabled) running on port ${PORT}`);
 });
