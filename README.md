@@ -1,2 +1,3 @@
-# saathi-server
-Backend API for SaathiMed Extension
+# SaathiMed Server
+Backend API for the SaathiMed Chrome Extension.
+Hosted on Render.
