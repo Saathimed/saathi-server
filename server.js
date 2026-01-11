@@ -43,6 +43,11 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// ✅ Browser Testing Route (Add this)
+app.get('/', (req, res) => {
+    res.send("🚀 SaathiMed Server is LIVE! WhatsApp Bot is listening on /api/whatsapp-webhook");
+});
+
 // --- API 1: EXTENSION - CHECK PATIENT (Real DB) ---
 app.post('/api/check-patient', async (req, res) => {
     const { phone } = req.body;
